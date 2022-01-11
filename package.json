@@ -1,0 +1,7 @@
+{
+  "name": "com.phantasmicgames.common",
+  "version": "0.1.0",
+  "displayName": "Common",
+  "unity": "2020.2",
+  "description": "A package with scripts frequently used throughout PhantasmicGames API"
+}
