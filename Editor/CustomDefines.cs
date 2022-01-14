@@ -144,34 +144,37 @@ namespace PhantasmicGames.CommonEditor
             PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, defines);
         }
 
-		internal class CustomAssetModificationProcessor : UnityEditor.AssetModificationProcessor
+        //Note: Only works when deleting script from the Editor and not from File Explorer.
+		private class CustomDefinesScriptDeletionListener : UnityEditor.AssetModificationProcessor
 		{
-			private static readonly DirectoryInfo s_ScriptDirectoryInfo = new DirectoryInfo(GetScriptPath());
             private static readonly string s_ScriptPath = GetScriptPath();
 
 			static AssetDeleteResult OnWillDeleteAsset(string assetName, RemoveAssetOptions options)
 			{
                 var fullAssetPath = Path.GetFullPath(assetName);
+                var deletingThisScript = s_ScriptPath.Contains(fullAssetPath);
 
-                if (s_ScriptPath.Contains(fullAssetPath))
-                {
-                    UnityEngine.Debug.Log("Need to delete all custom defines");
-                    foreach (var typeName in s_RegisteredCustomDefinesTypeAssemblyQualifiedNames)
-                    {
-                        var key = GetCustomDefinesSaveKey(typeName);
-                        var definesFromType = EditorPrefs.GetString(key).Split(';');
-                        foreach (var targetGroup in s_AvailableBuildTargetGroups)
-                        {
-                            foreach (var define in definesFromType)
-                                RemoveDefineForBuildTargetGroup(define, targetGroup);
-                        }
-                        EditorPrefs.DeleteKey(key);
-                    }
-                    EditorPrefs.DeleteKey(kAllCustomDefinesTypesKey);
-                }
+                if (deletingThisScript)
+                    ClearAllCustomDefines();
 
 				return AssetDeleteResult.DidNotDelete;
 			}
+
+            private static void ClearAllCustomDefines()
+            {
+                foreach (var typeName in s_RegisteredCustomDefinesTypeAssemblyQualifiedNames)
+                {
+                    var key = GetCustomDefinesSaveKey(typeName);
+                    var definesFromType = EditorPrefs.GetString(key).Split(';');
+                    foreach (var targetGroup in s_AvailableBuildTargetGroups)
+                    {
+                        foreach (var define in definesFromType)
+                            RemoveDefineForBuildTargetGroup(define, targetGroup);
+                    }
+                    EditorPrefs.DeleteKey(key);
+                }
+                EditorPrefs.DeleteKey(kAllCustomDefinesTypesKey);
+            }
 
 			private static string GetScriptPath([System.Runtime.CompilerServices.CallerFilePath] string fileName = null) => fileName;
 		}
