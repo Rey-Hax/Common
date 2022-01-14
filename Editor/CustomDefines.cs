@@ -147,17 +147,15 @@ namespace PhantasmicGames.CommonEditor
 		internal class CustomAssetModificationProcessor : UnityEditor.AssetModificationProcessor
 		{
 			private static readonly DirectoryInfo s_ScriptDirectoryInfo = new DirectoryInfo(GetScriptPath());
+            private static readonly string s_ScriptPath = GetScriptPath();
 
 			static AssetDeleteResult OnWillDeleteAsset(string assetName, RemoveAssetOptions options)
 			{
-				var assetDir = new DirectoryInfo(assetName);
+                var fullAssetPath = Path.GetFullPath(assetName);
 
-                //TODO: Determine when this scripts is being deleted
-                // if(assetDir == GetScriptPath()) wont always work, need to check if parent folder is getting deleted
-                var deletingThisScript = false;
-
-                if (deletingThisScript)
+                if (s_ScriptPath.Contains(fullAssetPath))
                 {
+                    UnityEngine.Debug.Log("Need to delete all custom defines");
                     foreach (var typeName in s_RegisteredCustomDefinesTypeAssemblyQualifiedNames)
                     {
                         var key = GetCustomDefinesSaveKey(typeName);
