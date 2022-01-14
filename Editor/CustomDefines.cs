@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 
@@ -32,72 +33,76 @@ namespace PhantasmicGames.CommonEditor
         private const string kCustomDefinesKeyPrefix = "CUSTOM_DEFINES=";
 
         private static readonly BuildTargetGroup[] s_AvailableBuildTargetGroups;
+        private static readonly List<string> s_RegisteredCustomDefinesTypeAssemblyQualifiedNames;
 
         static CustomDefinesManager()
         {
 			s_AvailableBuildTargetGroups = GetAvailableBuildTargetGroups();
+            s_RegisteredCustomDefinesTypeAssemblyQualifiedNames = EditorPrefs.GetString(kAllCustomDefinesTypesKey).Split(';').ToList();
 
-            var registeredCustomDefinesTypeNames = EditorPrefs.GetString(kAllCustomDefinesTypesKey).Split(';').ToList();
             ClearRemovedCustomDefines();
             ProcessCustomDefines();
 
-            EditorPrefs.SetString(kAllCustomDefinesTypesKey, string.Join(";", registeredCustomDefinesTypeNames));
-
-            BuildTargetGroup[] GetAvailableBuildTargetGroups()
-            {
-                var result = new List<BuildTargetGroup>();
-
-                var allBuildTargets = (BuildTarget[])Enum.GetValues(typeof(BuildTarget));
-                foreach (var buildTarget in allBuildTargets)
-                {
-                    var buildTargetGroup = BuildPipeline.GetBuildTargetGroup(buildTarget);
-                    if (result.Contains(buildTargetGroup))
-                        continue;
-                    if (BuildPipeline.IsBuildTargetSupported(buildTargetGroup, buildTarget))
-                        result.Add(buildTargetGroup);
-                }
-
-                return result.ToArray();
-            }
-            void ClearRemovedCustomDefines()
-            {
-                for (int i = registeredCustomDefinesTypeNames.Count - 1; i >= 0; i--)
-                {
-                    var typeName = registeredCustomDefinesTypeNames[i];
-                    var type = Type.GetType(typeName);
-                    if (type == null)
-                    {
-                        var key = GetCustomDefinesSaveKey(typeName);
-                        var defines = EditorPrefs.GetString(key).Split(';');
-                        EditorPrefs.DeleteKey(key);
-                        foreach (var define in defines)
-                        {
-                            foreach (var targetGroup in s_AvailableBuildTargetGroups)
-                                RemoveDefineForBuildTargetGroup(define, targetGroup);
-                        }
-                        registeredCustomDefinesTypeNames.RemoveAt(i);
-                    }
-                }
-            }
-            void ProcessCustomDefines()
-            {
-                foreach (var customDefinesType in TypeCache.GetTypesDerivedFrom<CustomDefines>())
-                {
-                    var instance = Activator.CreateInstance(customDefinesType) as CustomDefines;
-                    var allDefines = string.Join(";", instance.allDefines);
-                    var typeName = customDefinesType.AssemblyQualifiedName;
-                    var key = GetCustomDefinesSaveKey(typeName);
-                    EditorPrefs.SetString(key, allDefines);
-
-                    if (!registeredCustomDefinesTypeNames.Contains(typeName))
-                        registeredCustomDefinesTypeNames.Add(typeName);
-
-                    if (instance.autoEvaluate)
-                        Evaluate(instance);
-                }
-            }
-		    string GetCustomDefinesSaveKey(string assemblyQualifiedName) => string.Concat(kCustomDefinesKeyPrefix, assemblyQualifiedName);
+            EditorPrefs.SetString(kAllCustomDefinesTypesKey, string.Join(";", s_RegisteredCustomDefinesTypeAssemblyQualifiedNames));
         }
+
+        private static BuildTargetGroup[] GetAvailableBuildTargetGroups()
+        {
+            var result = new List<BuildTargetGroup>();
+
+            var allBuildTargets = (BuildTarget[])Enum.GetValues(typeof(BuildTarget));
+            foreach (var buildTarget in allBuildTargets)
+            {
+                var buildTargetGroup = BuildPipeline.GetBuildTargetGroup(buildTarget);
+                if (result.Contains(buildTargetGroup))
+                    continue;
+                if (BuildPipeline.IsBuildTargetSupported(buildTargetGroup, buildTarget))
+                    result.Add(buildTargetGroup);
+            }
+
+            return result.ToArray();
+        }
+
+        private static void ClearRemovedCustomDefines()
+        {
+            for (int i = s_RegisteredCustomDefinesTypeAssemblyQualifiedNames.Count - 1; i >= 0; i--)
+            {
+                var typeName = s_RegisteredCustomDefinesTypeAssemblyQualifiedNames[i];
+                var type = Type.GetType(typeName);
+                if (type == null)
+                {
+                    var key = GetCustomDefinesSaveKey(typeName);
+                    var defines = EditorPrefs.GetString(key).Split(';');
+                    EditorPrefs.DeleteKey(key);
+                    foreach (var define in defines)
+                    {
+                        foreach (var targetGroup in s_AvailableBuildTargetGroups)
+                            RemoveDefineForBuildTargetGroup(define, targetGroup);
+                    }
+                    s_RegisteredCustomDefinesTypeAssemblyQualifiedNames.RemoveAt(i);
+                }
+            }
+        }
+
+        private static void ProcessCustomDefines()
+        {
+            foreach (var customDefinesType in TypeCache.GetTypesDerivedFrom<CustomDefines>())
+            {
+                var instance = Activator.CreateInstance(customDefinesType) as CustomDefines;
+                var allDefines = string.Join(";", instance.allDefines);
+                var typeName = customDefinesType.AssemblyQualifiedName;
+                var key = GetCustomDefinesSaveKey(typeName);
+                EditorPrefs.SetString(key, allDefines);
+
+                if (!s_RegisteredCustomDefinesTypeAssemblyQualifiedNames.Contains(typeName))
+                    s_RegisteredCustomDefinesTypeAssemblyQualifiedNames.Add(typeName);
+
+                if (instance.autoEvaluate)
+                    Evaluate(instance);
+            }
+        }
+
+        private static string GetCustomDefinesSaveKey(string assemblyQualifiedName) => string.Concat(kCustomDefinesKeyPrefix, assemblyQualifiedName);
 
         internal static void Evaluate(CustomDefines customDefines)
         {
@@ -119,7 +124,7 @@ namespace PhantasmicGames.CommonEditor
             }
         }
 
-        public static void AddDefineForBuildTargetGroup(string define, BuildTargetGroup targetGroup)
+        private static void AddDefineForBuildTargetGroup(string define, BuildTargetGroup targetGroup)
         {
             PlayerSettings.GetScriptingDefineSymbolsForGroup(targetGroup, out string[] defines);
             if (defines.Contains(define))
@@ -129,7 +134,7 @@ namespace PhantasmicGames.CommonEditor
             PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, defines);
         }
 
-        public static void RemoveDefineForBuildTargetGroup(string define, BuildTargetGroup targetGroup)
+        private static void RemoveDefineForBuildTargetGroup(string define, BuildTargetGroup targetGroup)
         {
             PlayerSettings.GetScriptingDefineSymbolsForGroup(targetGroup, out string[] defines);
             if (!defines.Contains(define))
@@ -138,5 +143,39 @@ namespace PhantasmicGames.CommonEditor
             defines = defines.Where(def => def != define).ToArray();
             PlayerSettings.SetScriptingDefineSymbolsForGroup(targetGroup, defines);
         }
+
+		internal class CustomAssetModificationProcessor : UnityEditor.AssetModificationProcessor
+		{
+			private static readonly DirectoryInfo s_ScriptDirectoryInfo = new DirectoryInfo(GetScriptPath());
+
+			static AssetDeleteResult OnWillDeleteAsset(string assetName, RemoveAssetOptions options)
+			{
+				var assetDir = new DirectoryInfo(assetName);
+
+                //TODO: Determine when this scripts is being deleted
+                // if(assetDir == GetScriptPath()) wont always work, need to check if parent folder is getting deleted
+                var deletingThisScript = false;
+
+                if (deletingThisScript)
+                {
+                    foreach (var typeName in s_RegisteredCustomDefinesTypeAssemblyQualifiedNames)
+                    {
+                        var key = GetCustomDefinesSaveKey(typeName);
+                        var definesFromType = EditorPrefs.GetString(key).Split(';');
+                        foreach (var targetGroup in s_AvailableBuildTargetGroups)
+                        {
+                            foreach (var define in definesFromType)
+                                RemoveDefineForBuildTargetGroup(define, targetGroup);
+                        }
+                        EditorPrefs.DeleteKey(key);
+                    }
+                    EditorPrefs.DeleteKey(kAllCustomDefinesTypesKey);
+                }
+
+				return AssetDeleteResult.DidNotDelete;
+			}
+
+			private static string GetScriptPath([System.Runtime.CompilerServices.CallerFilePath] string fileName = null) => fileName;
+		}
 	}
 }
