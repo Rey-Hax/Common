@@ -4,12 +4,12 @@ using UnityEngine;
 [AttributeUsage(AttributeTargets.Field)]
 public class TypePickerAttribute : PropertyAttribute
 {
-	public Type type;
+	public Type baseType;
 	public bool includeProvidedType;
 
-	public TypePickerAttribute(Type type, bool includeProvidedType = false)
+	public TypePickerAttribute(Type baseType, bool includeProvidedType = false)
 	{
-		this.type = type;
+		this.baseType = baseType;
 		this.includeProvidedType = includeProvidedType;
 	}
 }

@@ -34,9 +34,9 @@ namespace PhantasmicGames.CommonEditor
 		{
 			var attrib = property.GetAttributeInAncestors<TypePickerAttribute>();
 
-			m_Types = TypeCache.GetTypesDerivedFrom(attrib.type).ToList();
+			m_Types = TypeCache.GetTypesDerivedFrom(attrib.baseType).ToList();
 			if (attrib.includeProvidedType)
-				m_Types.Insert(0, attrib.type);
+				m_Types.Insert(0, attrib.baseType);
 			m_Types.Insert(0, null);            //For selecting no type
 
 			m_Options = new GUIContent[m_Types.Count];
